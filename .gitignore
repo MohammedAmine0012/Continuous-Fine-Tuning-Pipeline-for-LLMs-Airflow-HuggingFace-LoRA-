@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.log
+
+# Virtual env
+venv/
+.env
+*.env
+
+# OS/editor
+.DS_Store
+Thumbs.db
+
+# Airflow runtime
+.airflow/
+airflow_home/
+
+# Data and artifacts
+data/
+
+# Training/adapters outputs (keep code only)
+adapters/
+
+# Local HF repo copy and large artifacts (use HF Hub instead)
+deepseek-stackoverflow-merged/
+
+# Caches
+.cache/
+.huggingface/

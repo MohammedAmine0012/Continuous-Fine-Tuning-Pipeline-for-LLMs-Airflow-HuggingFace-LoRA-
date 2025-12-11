@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepSeek Chat</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background: #0b1020; color: #e6e6e6; }
+    .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+    .card { background: #111732; border: 1px solid #1e284d; border-radius: 10px; overflow: hidden; }
+    .header { padding: 14px 16px; font-weight: 600; background: #0d1430; border-bottom: 1px solid #1e284d; }
+    .messages { height: 60vh; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { padding: 10px 12px; border-radius: 10px; max-width: 80%; white-space: pre-wrap; }
+    .user { align-self: flex-end; background: #1f2b59; }
+    .bot { align-self: flex-start; background: #0f1b44; }
+    .input { display: flex; gap: 8px; border-top: 1px solid #1e284d; padding: 10px; background: #0d1430; }
+    textarea { flex: 1; resize: vertical; min-height: 48px; max-height: 160px; border-radius: 8px; border: 1px solid #1e284d; background: #0b1020; color: #e6e6e6; padding: 10px; }
+    button { background: #3b82f6; color: white; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .footer { font-size: 12px; color: #a3a3a3; padding: 8px 12px; text-align: right; }
+    .controls { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-top: 1px solid #1e284d; background: #0d1430; font-size: 14px; }
+    .spinner { display: none; font-size: 12px; color: #9aa4c9; padding: 0 12px 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">DeepSeek Chat</div>
+      <div id="messages" class="messages"></div>
+      <div class="spinner" id="spinner">Generating…</div>
+      <div class="input">
+        <textarea id="prompt" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+        <button id="send">Send</button>
+      </div>
+      <div class="controls">
+        <label>Temp <input id="temp" type="number" min="0" max="2" step="0.1" value="0.7" style="width:70px;background:#0b1020;color:#e6e6e6;border:1px solid #1e284d;border-radius:6px;padding:4px 6px;"></label>
+        <label>Max tokens <input id="max_new" type="number" min="1" max="1024" step="1" value="200" style="width:90px;background:#0b1020;color:#e6e6e6;border:1px solid #1e284d;border-radius:6px;padding:4px 6px;"></label>
+        <span class="footer" style="flex:1;text-align:right;">Backend: FastAPI -> Triton (deepseek_merged)</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = (localStorage.getItem('api_base') || window.location.origin).replace(/\/$/, '');
+    const messages = document.getElementById('messages');
+    const promptEl = document.getElementById('prompt');
+    const sendBtn = document.getElementById('send');
+    const spinner = document.getElementById('spinner');
+    const tempEl = document.getElementById('temp');
+    const maxNewEl = document.getElementById('max_new');
+
+    const history = []; // {role: 'user'|'assistant', content: string}
+
+    function renderMarkdown(text) {
+      try {
+        return text.replace(/```([\s\S]*?)```/g, (m, code) => {
+          return '<pre style="background:#080d1f;border:1px solid #1e284d;border-radius:8px;padding:10px;white-space:pre-wrap;">' +
+                 code.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
+        });
+      } catch { return text; }
+    }
+
+    function addMessage(text, who) {
+      const div = document.createElement('div');
+      div.className = `msg ${who}`;
+      div.innerHTML = renderMarkdown(text);
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function send() {
+      const text = promptEl.value.replace(/\s+$/,'').trim();
+      if (!text) return; // ignore empty
+      addMessage(text, 'user');
+      history.push({ role: 'user', content: text });
+      promptEl.value = '';
+      sendBtn.disabled = true;
+      spinner.style.display = 'block';
+
+      try {
+        const payload = {
+          message: text,
+          history: history,
+          temperature: parseFloat(tempEl.value),
+          max_new_tokens: parseInt(maxNewEl.value, 10)
+        };
+        const res = await fetch(`${API_BASE}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        const reply = (data && data.reply) ? data.reply : '[empty reply]';
+        addMessage(reply, 'bot');
+        history.push({ role: 'assistant', content: reply });
+      } catch (e) {
+        addMessage('Request failed: ' + e.message, 'bot');
+      } finally {
+        sendBtn.disabled = false;
+        spinner.style.display = 'none';
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    promptEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+  </script>
+</body>
+</html>

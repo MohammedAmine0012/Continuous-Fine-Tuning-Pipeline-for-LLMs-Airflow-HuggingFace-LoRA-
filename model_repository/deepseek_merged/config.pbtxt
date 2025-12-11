@@ -1,0 +1,21 @@
+name: "deepseek_merged"
+backend: "python"
+max_batch_size: 8
+
+input [
+  { name: "prompt", data_type: TYPE_STRING, dims: [ -1 ] }
+]
+
+output [
+  { name: "text", data_type: TYPE_STRING, dims: [ -1 ] }
+]
+
+instance_group [
+  { kind: KIND_GPU }
+]
+
+# Optional: if you build a Python stub venv for triton_python_backend
+# parameters: {
+#   key: "EXECUTION_ENV_PATH"
+#   value: { string_value: "venv" }
+# }

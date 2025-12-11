@@ -1,0 +1,21 @@
+FROM nvcr.io/nvidia/tritonserver:24.11-py3
+
+# More robust pip behavior
+ENV PIP_DEFAULT_TIMEOUT=120
+ENV HF_HUB_ENABLE_HF_TRANSFER=0
+
+# Install GPU PyTorch (CUDA 12.1) first
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    --extra-index-url https://download.pytorch.org/whl/cu121 \
+    torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1
+
+# Install remaining dependencies
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    numpy \
+    transformers==4.57.3 \
+    peft \
+    accelerate \
+    safetensors \
+    sentencepiece \
+    tokenizers \
+    huggingface_hub

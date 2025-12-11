@@ -1,0 +1,24 @@
+transformers
+accelerate
+datasets
+torch
+tqdm
+scikit-learn
+numpy
+pandas
+matplotlib
+seaborn
+bert-score
+sacrebleu
+peft
+apache-airflow
+evaluate
+beautifulsoup4
+html2text
+huggingface_hub
+trl
+
+# web server
+fastapi
+uvicorn
+requests
