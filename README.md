@@ -1,125 +1,123 @@
-# Continuous Fine-Tuning Pipeline for LLMs (Airflow + Hugging Face + LoRA)
+# 🚀 StackOverflow Assistant: Continuous Fine-Tuning Pipeline
 
-Production workflow to continuously fine-tune a base LLM with domain data, evaluate, publish to Hugging Face Hub, and deploy for inference (Triton Server; optional vLLM). Includes a minimal Chat UI.
+A production-grade **Self-Improving AI System** that continuously fine-tunes a Large Language Model (DeepSeek Coder) on new domain-specific data, evaluates its quality, and automatically deploys it for high-performance inference.
 
-## Features
-- LoRA fine-tuning with PEFT and Transformers
-- Data ingest + tokenization utilities
-- Evaluation: SacreBLEU and BERTScore
-- Merge LoRA adapters into full weights
-- Publish merged model to Hugging Face Hub
-- Triton Inference Server deployment (Python backend)
-- Minimal FastAPI proxy + web UI (ChatGPT-style)
-- Airflow DAG orchestrating the full pipeline
+![Status](https://img.shields.io/badge/Status-Operational-success)
+![Stack](https://img.shields.io/badge/Stack-Airflow%20%7C%20Triton%20%7C%20LoRA-blue)
 
-## Repository layout
-```
-└─ project/
-   ├─ src/
-   │  ├─ data_preprocessing.py   ├─ dataset.py        ├─ tokenizer.py
-   │  ├─ train.py                ├─ merge.py          ├─ evaluate.py
-   │  ├─ save_upload.py          ├─ inference_client.py
-   │  └─ web_server.py (FastAPI -> Triton)
-   ├─ model_repository/
-   │  └─ deepseek_merged/
-   │     ├─ config.pbtxt (backend: python, STRING I/O)
-   │     └─ 1/model.py  (loads model from HF or local)
-   ├─ airflow_dags/continuous_finetune.py
-   ├─ webui/index.html (chat UI)
-   ├─ Dockerfile.triton-hf
-   ├─ requirements.txt
-   └─ README.md
+---
+
+## 🏗️ Architecture
+
+The system is designed as a closed-loop pipeline:
+
+```mermaid
+graph LR
+    A[New Data] -->|1. Ingest| B[Airflow Pipeline]
+    B -->|2. Fine-Tune (LoRA)| C[DeepSeek Coder]
+    C -->|3. Evaluate (BLEU/BERT)| D{Quality Gate}
+    D -- Pass --> E[Merge & Deploy]
+    D -- Fail --> F[Discard]
+    E -->|4. Push| G[Hugging Face Hub]
+    G -->|5. Pull| H[Triton Inference Server]
+    H -->|6. Serve| I[Web Interface]
 ```
 
-## Prerequisites
-- Python 3.10+ (virtualenv recommended)
-- NVIDIA GPU + CUDA drivers
-- Docker
-- Hugging Face account and access token
+### Components
+1.  **Airflow Orchestrator**: Manages the end-to-end workflow (Ingest → Train → Merge → Deploy).
+2.  **Fine-Tuning Engine**: Uses **LoRA** (Low-Rank Adaptation) for efficient, low-cost training on new data.
+3.  **Deployment Target**: **Hugging Face Hub** acts as the Model Registry / Source of Truth.
+4.  **Inference Server**: **NVIDIA Triton Inference Server** (running in Docker) provides high-performance serving.
+5.  **Web Interface**: A modern Glassmorphism-style chat UI (FastAPI + HTML/JS) for user interaction.
 
-## Setup
-```powershell
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+*   **NVIDIA GPU**: Minimum 24GB VRAM recommended (A10G, A100, or RTX 3090/4090).
+*   **Docker & Docker Compose**: For running the infrastructure.
+*   **Python 3.10+**: For local development.
+*   **Hugging Face Object**: A Read/Write access token.
+
+### 1. Installation
+
+Clone the repository and install dependencies:
+```bash
+git clone https://github.com/YOUR_USERNAME/stackoverflow-assistant.git
+cd stackoverflow-assistant
+
+# Create virtual env
 python -m venv venv
-./venv/Scripts/Activate
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+
+# Install Python deps
 pip install -r requirements.txt
 ```
 
-Environment variables (examples):
-```powershell
-$env:HF_TOKEN = "hf_..."
-$env:HF_MODEL_ID = "Moamineelhilali/deepseek-stackoverflow-merged"
+### 2. Configuration
+Create a `.env` file in the root directory:
+```env
+HF_TOKEN=hf_your_token_here
+HF_REPO_NAME=your_username/deepseek-stackoverflow-merged
+TRITON_HTTP_URL=http://localhost:8000
 ```
 
-## Run Triton Inference Server
-```powershell
-docker run --gpus=all --rm `
-  --dns 1.1.1.1 --dns 8.8.8.8 `
-  -p 8000:8000 -p 8001:8001 -p 8002:8002 `
-  -e HF_TOKEN=$env:HF_TOKEN `
-  -e HF_MODEL_ID=$env:HF_MODEL_ID `
-  -v "${PWD}\model_repository:/models" `
-  my-triton-hf tritonserver --model-repository=/models
+---
+
+## 🏃 Usage
+
+### A. Running the Chat Interface (Manual Mode)
+If you just want to chat with the AI:
+```bash
+# 1. Start the Web Server
+python -m uvicorn src.web_server:app --port 8080 --reload
 ```
-- Health: http://localhost:8000/v2/health/ready
-- Model name: `deepseek_merged`
+Open **http://localhost:8080** in your browser.
 
-Quick client test:
+### B. Running the Inference Server (Triton)
+To serve the model with high performance:
 ```powershell
-python src\inference_client.py --model deepseek_merged --prompt "Hello"
-```
-
-## Web Chat (FastAPI + HTML)
-Run the proxy API and UI:
-```powershell
-uvicorn src.web_server:app --host 0.0.0.0 --port 8080
-```
-Open http://localhost:8080 and chat. The UI calls FastAPI, which forwards to Triton.
-
-Environment overrides:
-- `TRITON_HTTP_URL` (default `http://localhost:8000`)
-- `TRITON_MODEL_NAME` (default `deepseek_merged`)
-
-## Airflow Pipeline
-The DAG `airflow_dags/continuous_finetune.py` orchestrates:
-1. Ingest/tokenize data
-2. LoRA fine-tuning
-3. Merge adapters -> full model
-4. Evaluate (BLEU, BERTScore)
-5. Publish to Hugging Face
-6. Deploy (Triton; optional vLLM)
-
-Quickstart:
-```powershell
-$env:AIRFLOW_HOME = "$PWD\airflow_home"
-airflow db init
-airflow users create --username admin --password admin --firstname a --lastname b --role Admin --email admin@example.com
-airflow webserver -p 8085
-# in another terminal
-airflow scheduler
+docker run --gpus=all --rm -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+  -v ${PWD}/model_repository:/models \
+  nvcr.io/nvidia/tritonserver:23.10-py3 \
+  tritonserver --model-repository=/models
 ```
 
-Configure Variables (UI → Admin → Variables), e.g.:
-- `DATA_DIR`: dataset path
-- `BASE_MODEL_ID`: e.g. meta-llama/Meta-Llama-3-8B-Instruct
-- `HF_TOKEN`, `HF_MERGED_REPO`: e.g. `Moamineelhilali/deepseek-stackoverflow-merged`
-- `LORA_OUTPUT_DIR`, `MERGED_OUTPUT_DIR`: artifact paths
-- `TRITON_MODEL_REPO`: `.../model_repository`
-- `TRITON_DOCKER_IMAGE`: `my-triton-hf`
-
-Trigger:
-```powershell
-airflow dags trigger continuous_finetune
+### C. Running the Automation Pipeline (Airflow)
+To start the continuous fine-tuning loop:
+```bash
+docker-compose up -d
 ```
+Access the Airflow UI at **http://localhost:8085**.
+1.  Enable the `continuous_finetune` DAG.
+2.  Trigger it manually or set a schedule.
 
-## Hugging Face Notes
-- Triton loads from `HF_MODEL_ID`; set `HF_TOKEN` for private repos.
-- For offline use, mount a local snapshot and set `HF_MODEL_ID` to that path.
+---
 
-## Troubleshooting
-- 400 invalid datatype: client must send BYTES for string tensors.
-- DNS failures in Docker: add `--dns 1.1.1.1 --dns 8.8.8.8`.
-- Triton backend error: ensure `backend: "python"` and correct mount path.
-- Large files: model weights are excluded by `.gitignore`; pull from HF.
+## 📂 Project Structure
 
-## License
-MIT (or update per your needs).
+| Path | Description |
+| :--- | :--- |
+| `airflow_dags/` | Airflow pipeline definitions (DAGs). |
+| `src/` | Core source code (Training, Ingestion, API). |
+| `src/train.py` | LoRA Fine-Tuning logic. |
+| `src/merge.py` | Merges LoRA adapters into the base model. |
+| `src/web_server.py` | FastAPI backend for the Chat UI. |
+| `webui/` | Frontend Assets (HTML/CSS/JS). |
+| `model_repository/` | Triton Server configuration. |
+
+---
+
+## 🛠️ Deployment on Azure
+
+This project is Cloud-Native ready.
+
+*   **Frontend**: Deploy `src/web_server.py` to **Azure App Service**.
+*   **Backend**: Deploy the Triton Docker container to **Azure Kubernetes Service (AKS)** or **Azure Container Instances (ACI)**.
+*   **Storage**: Use Azure Files for the model repository or pull directly from Hugging Face.
+
+---
+
+## 📄 License
+MIT License. Free to use and modify.
