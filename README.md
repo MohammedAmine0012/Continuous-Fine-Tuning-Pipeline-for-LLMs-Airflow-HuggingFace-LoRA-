@@ -1,123 +1,134 @@
-# 🚀 StackOverflow Assistant: Continuous Fine-Tuning Pipeline
+# 🚀 StackOverflow Assistant: Full-Stack MLOps & serving System
 
-A production-grade **Self-Improving AI System** that continuously fine-tunes a Large Language Model (DeepSeek Coder) on new domain-specific data, evaluates its quality, and automatically deploys it for high-performance inference.
+A production-grade **Self-Improving AI System** that continuously fine-tunes a Large Language Model (DeepSeek Coder) on new domain-specific data, evaluates its quality, and automatically deploys it for high-performance inference on **Azure Cloud** or local infrastructure.
 
 ![Status](https://img.shields.io/badge/Status-Operational-success)
-![Stack](https://img.shields.io/badge/Stack-Airflow%20%7C%20Triton%20%7C%20LoRA-blue)
+![Stack](https://img.shields.io/badge/Stack-Airflow%20%7C%20Triton%20%7C%20LoRA%20%7C%20Azure-blue)
+
+---
+
+## ✨ Key Features
+
+### 🎨 Premium User Experience
+- **Modern UI**: Sleek glassmorphism design with deep blue/purple aesthetics.
+- **ChatGPT-style Sidebar**: Collapsible history pane for managing conversations.
+- **Chat Persistence**: Automatic local history saving (localStorage) with delete/load capabilities.
+- **Thinking State**: Visual pulse animations while the AI generates responses.
+- **Identity**: Fully branded as **StackOverflow Assistant**.
+
+### 🕒 Automated MLOps Pipeline (Airflow)
+- **Continuous Ingestion**: Automatically pulls and processes new data.
+- **LoRA Fine-Tuning**: Efficient training using Low-Rank Adaptation (Peft).
+- **Quality Gate**: Automatic evaluation using **BLEU** and **BERTScore**; only "good" models proceed.
+- **Zero-Downtime Reload**: Integrated `reload_triton` task that pings the server (Local or Azure) to swap in the new brain instantly after deployment.
+
+### ☁️ Cloud & Hybrid Deployment
+- **Azure ACI**: Automated deployment to **Azure Container Instances**.
+- **Integrated ACR**: Private storage for the Triton Docker image in **Azure Container Registry**.
+- **Managed Storage**: Azure File Shares for persistent model weights.
+- **Flexible Serving**: Graceful fallbacks between **Triton (Docker/Azure)** -> **Local Inference (Python)** -> **Mock Mode**.
 
 ---
 
 ## 🏗️ Architecture
 
-The system is designed as a closed-loop pipeline:
-
 ```mermaid
-graph LR
-    A[New Data] -->|1. Ingest| B[Airflow Pipeline]
-    B -->|2. Fine-Tune (LoRA)| C[DeepSeek Coder]
-    C -->|3. Evaluate (BLEU/BERT)| D{Quality Gate}
-    D -- Pass --> E[Merge & Deploy]
-    D -- Fail --> F[Discard]
-    E -->|4. Push| G[Hugging Face Hub]
-    G -->|5. Pull| H[Triton Inference Server]
-    H -->|6. Serve| I[Web Interface]
-```
+graph TD
+    subgraph "Local Environment (Training)"
+        A[New Data] -->|Ingest| B[Airflow Orchestrator]
+        B -->|Train| C[LoRA Fine-Tuning]
+        C -->|Evaluate| D{Quality Gate}
+        D -- Pass --> E[Merge & Push]
+    end
 
-### Components
-1.  **Airflow Orchestrator**: Manages the end-to-end workflow (Ingest → Train → Merge → Deploy).
-2.  **Fine-Tuning Engine**: Uses **LoRA** (Low-Rank Adaptation) for efficient, low-cost training on new data.
-3.  **Deployment Target**: **Hugging Face Hub** acts as the Model Registry / Source of Truth.
-4.  **Inference Server**: **NVIDIA Triton Inference Server** (running in Docker) provides high-performance serving.
-5.  **Web Interface**: A modern Glassmorphism-style chat UI (FastAPI + HTML/JS) for user interaction.
+    subgraph "Model Registry"
+        E --> F[Hugging Face Hub]
+    end
+
+    subgraph "Deployment Strategy (Cloud)"
+        F -->|Auto-Reload| G[Azure Triton ACI]
+        H[Azure File Share] -->|Mount| G
+    end
+
+    subgraph "End User Interface"
+        G -->|Serve| I[FastAPI Web Server]
+        I -->|Interactive| J[Glassmorphism UI]
+    end
+```
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-*   **NVIDIA GPU**: Minimum 24GB VRAM recommended (A10G, A100, or RTX 3090/4090).
-*   **Docker & Docker Compose**: For running the infrastructure.
-*   **Python 3.10+**: For local development.
-*   **Hugging Face Object**: A Read/Write access token.
+- **Azure CLI**: Logged in (`az login`).
+- **Docker**: For local Airflow and Triton testing.
+- **Hugging Face Token**: Read/Write access (stored in `.env`).
+- **Python 3.10+**: For the web server and training scripts.
 
-### 1. Installation
+### 📦 1. Installation
 
-Clone the repository and install dependencies:
-```bash
-git clone https://github.com/YOUR_USERNAME/stackoverflow-assistant.git
-cd stackoverflow-assistant
+```powershell
+git clone https://github.com/MohammedAmine0012/Continuous-Fine-Tuning-Pipeline-for-LLMs-Airflow-HuggingFace-LoRA-.git
+cd Continuous-Fine-Tuning-Pipeline-for-LLMs-Airflow-HuggingFace-LoRA-
 
-# Create virtual env
+# Setup virtual environment
 python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+.\venv\Scripts\activate
 
-# Install Python deps
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Configuration
-Create a `.env` file in the root directory:
+### ⚙️ 2. Configuration
+Create/Update your `.env` file:
 ```env
 HF_TOKEN=hf_your_token_here
-HF_REPO_NAME=your_username/deepseek-stackoverflow-merged
-TRITON_HTTP_URL=http://localhost:8000
+HF_REPO_NAME=your_username/project_name
+TRITON_HTTP_URL=http://20.40.151.160:8000  # Set your Azure IP or localhost
 ```
 
 ---
 
-## 🏃 Usage
+## 🏃 How to Run
 
-### A. Running the Chat Interface (Manual Mode)
-If you just want to chat with the AI:
-```bash
-# 1. Start the Web Server
-python -m uvicorn src.web_server:app --port 8080 --reload
-```
-Open **http://localhost:8080** in your browser.
-
-### B. Running the Inference Server (Triton)
-To serve the model with high performance:
-```powershell
-docker run --gpus=all --rm -p 8000:8000 -p 8001:8001 -p 8002:8002 \
-  -v ${PWD}/model_repository:/models \
-  nvcr.io/nvidia/tritonserver:23.10-py3 \
-  tritonserver --model-repository=/models
-```
-
-### C. Running the Automation Pipeline (Airflow)
-To start the continuous fine-tuning loop:
+### A. Start the Pipeline (Airflow)
+This runs the full automation loop.
 ```bash
 docker-compose up -d
 ```
-Access the Airflow UI at **http://localhost:8085**.
-1.  Enable the `continuous_finetune` DAG.
-2.  Trigger it manually or set a schedule.
+- **UI**: http://localhost:8085 (Username: `airflow`, Password: `airflow`)
+- **Action**: Enable and Trigger the `continuous_finetune` DAG.
+
+### B. Start the Chat Web UI
+This starts the StackOverflow Assistant frontend.
+```bash
+python -m uvicorn src.web_server:app --port 8080 --reload
+```
+- **UI**: http://127.0.0.1:8080
+
+### C. Deploy to Azure (Cloud Triton)
+To move your inference server to the cloud, use the provided deployment commands:
+1. **Push Image**: `docker push mytritonregistry.azurecr.io/triton-custom:latest`
+2. **Setup Storage**: Create Storage Account & File Share `model-repo-share`.
+3. **Run ACI**: 
+   ```powershell
+   az container create --resource-group YOUR_RG --name triton-server --image YOUR_ACR_IMAGE --ip-address Public --os-type Linux ...
+   ```
 
 ---
 
 ## 📂 Project Structure
 
-| Path | Description |
+| Directory/File | Description |
 | :--- | :--- |
-| `airflow_dags/` | Airflow pipeline definitions (DAGs). |
-| `src/` | Core source code (Training, Ingestion, API). |
-| `src/train.py` | LoRA Fine-Tuning logic. |
-| `src/merge.py` | Merges LoRA adapters into the base model. |
-| `src/web_server.py` | FastAPI backend for the Chat UI. |
-| `webui/` | Frontend Assets (HTML/CSS/JS). |
-| `model_repository/` | Triton Server configuration. |
-
----
-
-## 🛠️ Deployment on Azure
-
-This project is Cloud-Native ready.
-
-*   **Frontend**: Deploy `src/web_server.py` to **Azure App Service**.
-*   **Backend**: Deploy the Triton Docker container to **Azure Kubernetes Service (AKS)** or **Azure Container Instances (ACI)**.
-*   **Storage**: Use Azure Files for the model repository or pull directly from Hugging Face.
+| `airflow_dags/` | The "Brain" of the automation. |
+| `src/web_server.py` | FastAPI server with multi-mode inference logic. |
+| `webui/` | Premium HTML/CSS/JS frontend. |
+| `model_repository/` | Triton configurations and load scripts. |
+| `src/pipeline_settings.py`| Central config for Airflow. |
 
 ---
 
 ## 📄 License
-MIT License. Free to use and modify.
+MIT License. Free to use and modify for personal and commercial use.
