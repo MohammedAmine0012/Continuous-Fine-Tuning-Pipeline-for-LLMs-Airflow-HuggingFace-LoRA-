@@ -5,7 +5,11 @@ sys.path.extend(["/opt/airflow", "/opt/airflow/src"])  # allow importing local p
 from airflow import DAG
 from airflow.models import Variable
 from airflow.operators.python import PythonOperator, BranchPythonOperator
+from airflow.sensors.python import PythonSensor
 from airflow.operators.empty import EmptyOperator
+import requests
+import os
+from huggingface_hub import HfApi
 
 # Project modules
 from src.ingest import materialize_cleaned_dataset
@@ -121,6 +125,32 @@ def run_deploy(**context):
     push_merged_to_hub(merged_dir, repo)
 
 
+def check_hf_data_status(**context):
+    """Checks if the dataset on HF has a newer commit than what we last processed."""
+    api = HfApi()
+    # Monitor the source dataset
+    dataset_id = "moamineelhilali/python_code_instructions_18k_alpaca"
+    
+    try:
+        info = api.dataset_info(dataset_id)
+        latest_sha = info.sha
+        
+        # Store/retrieve last seen SHA from Airflow Variable
+        var_name = f"hf_last_sha_{dataset_id.replace('/', '_')}"
+        last_sha = Variable.get(var_name, default_var=None)
+        
+        if latest_sha != last_sha:
+            print(f"New data detected! SHA changed from {last_sha} to {latest_sha}")
+            Variable.set(var_name, latest_sha)
+            return True
+        else:
+            print(f"No new data. Current SHA {latest_sha} matches last processed.")
+            return False
+    except Exception as e:
+        print(f"Error checking HF: {e}")
+        return False
+
+
 def run_reload(**context):
     import requests
     # Allow overriding via Airflow Variables
@@ -151,10 +181,18 @@ with DAG(
     dag_id='continuous_finetune',
     default_args=default_args,
     description='Ingest -> Train -> Evaluate -> Gate -> Merge -> Deploy',
-    schedule_interval=None,  # set a cron string for periodic runs
+    schedule_interval="@hourly", # Check every hour for new data
     start_date=datetime(2025, 1, 1),
     catchup=False,
 ) as dag:
+
+    t_sensor = PythonSensor(
+        task_id='check_for_new_data',
+        python_callable=check_hf_data_status,
+        timeout=60 * 5,  # 5 minutes
+        mode='reschedule', # Release slot while waiting
+        poke_interval=60 * 60, # Only poke once per hour (matches schedule)
+    )
 
     t_ingest = PythonOperator(
         task_id='ingest_preprocess',
@@ -194,6 +232,6 @@ with DAG(
 
     t_stop = EmptyOperator(task_id='stop_pipeline')
 
-    t_ingest >> t_train >> t_eval >> t_gate
+    t_sensor >> t_ingest >> t_train >> t_eval >> t_gate
     t_gate >> t_merge >> t_deploy >> t_reload
     t_gate >> t_stop
