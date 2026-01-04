@@ -35,10 +35,11 @@ A production-grade **Self-Improving AI System** that continuously fine-tunes a L
 ```mermaid
 graph TD
     subgraph "Local Environment (Training)"
-        A["New Data"] -->|"Ingest"| B["Airflow Orchestrator"]
-        B -->|"Train (LoRA)"| C["DeepSeek Coder (LoRA)"]
-        C -->|"Evaluate"| D{"Quality Gate"}
-        D -- "Pass" --> E["Merge & Push"]
+        S["Hugging Face Sensor"] -->|"New Data Detected"| B["Airflow Orchestrator"]
+        B -->|"1. Ingest"| A["New Data"]
+        B -->|"2. Train (LoRA)"| C["DeepSeek Coder (LoRA)"]
+        C -->|"3. Evaluate"| D{"Quality Gate"}
+        D -- "Pass" --> E["4. Merge & Push"]
     end
 
     subgraph "Model Registry"
