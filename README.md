@@ -36,7 +36,7 @@ A production-grade **Self-Improving AI System** that continuously fine-tunes a L
 graph TD
     subgraph "Local Environment (Training)"
         A[New Data] -->|Ingest| B[Airflow Orchestrator]
-        B -->|Train| C[LoRA Fine-Tuning]
+        B -->|"Train (LoRA)"| C["DeepSeek Coder (LoRA)"]
         C -->|Evaluate| D{Quality Gate}
         D -- Pass --> E[Merge & Push]
     end
