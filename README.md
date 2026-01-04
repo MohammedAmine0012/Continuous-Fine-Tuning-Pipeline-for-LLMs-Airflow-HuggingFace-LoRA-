@@ -35,24 +35,24 @@ A production-grade **Self-Improving AI System** that continuously fine-tunes a L
 ```mermaid
 graph TD
     subgraph "Local Environment (Training)"
-        A[New Data] -->|Ingest| B[Airflow Orchestrator]
+        A["New Data"] -->|"Ingest"| B["Airflow Orchestrator"]
         B -->|"Train (LoRA)"| C["DeepSeek Coder (LoRA)"]
-        C -->|Evaluate| D{Quality Gate}
-        D -- Pass --> E[Merge & Push]
+        C -->|"Evaluate"| D{"Quality Gate"}
+        D -- "Pass" --> E["Merge & Push"]
     end
 
     subgraph "Model Registry"
-        E --> F[Hugging Face Hub]
+        E --> F["Hugging Face Hub"]
     end
 
     subgraph "Deployment Strategy (Cloud)"
-        F -->|Auto-Reload| G[Azure Triton ACI]
-        H[Azure File Share] -->|Mount| G
+        F -->|"Auto-Reload"| G["Azure Triton ACI"]
+        H["Azure File Share"] -->|"Mount"| G
     end
 
     subgraph "End User Interface"
-        G -->|Serve| I[FastAPI Web Server]
-        I -->|Interactive| J[Glassmorphism UI]
+        G -->|"Serve"| I["FastAPI Web Server"]
+        I -->|"Interactive"| J["Glassmorphism UI"]
     end
 ```
 
